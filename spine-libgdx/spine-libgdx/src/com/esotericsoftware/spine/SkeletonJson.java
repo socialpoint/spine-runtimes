@@ -45,6 +45,7 @@ import com.esotericsoftware.spine.Animation.CurveTimeline;
 import com.esotericsoftware.spine.Animation.DeformTimeline;
 import com.esotericsoftware.spine.Animation.DrawOrderTimeline;
 import com.esotericsoftware.spine.Animation.EventTimeline;
+import com.esotericsoftware.spine.Animation.ScriptTimeline;
 import com.esotericsoftware.spine.Animation.IkConstraintTimeline;
 import com.esotericsoftware.spine.Animation.PathConstraintMixTimeline;
 import com.esotericsoftware.spine.Animation.PathConstraintPositionTimeline;
@@ -59,6 +60,11 @@ import com.esotericsoftware.spine.BoneData.TransformMode;
 import com.esotericsoftware.spine.PathConstraintData.PositionMode;
 import com.esotericsoftware.spine.PathConstraintData.RotateMode;
 import com.esotericsoftware.spine.PathConstraintData.SpacingMode;
+import com.esotericsoftware.spine.ScriptData.BooleanScriptProperty;
+import com.esotericsoftware.spine.ScriptData.FloatScriptProperty;
+import com.esotericsoftware.spine.ScriptData.ScriptProperty;
+import com.esotericsoftware.spine.ScriptData.StringScriptProperty;
+import com.esotericsoftware.spine.ScriptData.ScriptPropertyType;
 import com.esotericsoftware.spine.attachments.AtlasAttachmentLoader;
 import com.esotericsoftware.spine.attachments.Attachment;
 import com.esotericsoftware.spine.attachments.AttachmentLoader;
@@ -243,6 +249,30 @@ public class SkeletonJson {
 			data.translateMix = constraintMap.getFloat("translateMix", 1);
 
 			skeletonData.pathConstraints.add(data);
+		}
+		
+		// Scripts.
+		for (JsonValue constraintMap = root.getChild("script"); constraintMap != null; constraintMap = constraintMap.next) {
+			ScriptData data = new ScriptData(constraintMap.getString("name"));
+			data.order = constraintMap.getInt("order", 0);
+
+			for (JsonValue propertyMap = constraintMap.getChild("properties"); propertyMap != null; propertyMap = propertyMap.next) {
+				String name = propertyMap.getString("name");
+				ScriptPropertyType type = Enum.valueOf(ScriptPropertyType.class, propertyMap.getString("type"));
+				switch (type) {
+				case booleanType:
+					data.properties.put(name, new BooleanScriptProperty(name, propertyMap.getBoolean("value")));
+					break;
+				case floatType:
+					data.properties.put(name, new FloatScriptProperty(name, propertyMap.getFloat("value")));
+					break;
+				case stringType:
+					data.properties.put(name, new StringScriptProperty(name, propertyMap.getString("value")));
+					break;
+				}
+			}
+
+			skeletonData.scripts.add(data);
 		}
 
 		// Skins.
@@ -578,6 +608,41 @@ public class SkeletonJson {
 					duration = Math.max(duration,
 						timeline.getFrames()[(timeline.getFrameCount() - 1) * PathConstraintMixTimeline.ENTRIES]);
 				}
+			}
+		}
+		
+		// Script timeline.
+		for (JsonValue scriptMap = map.getChild("scripts"); scriptMap != null; scriptMap = scriptMap.next) {
+			ScriptData data = skeletonData.findScript(scriptMap.name);
+			if (data == null) throw new SerializationException("Script not found: " + scriptMap.getString("name"));
+			int index = skeletonData.scripts.indexOf(data, true);
+			for (JsonValue timelineMap = scriptMap.child; timelineMap != null; timelineMap = timelineMap.next) {
+				ScriptTimeline timeline = new ScriptTimeline(timelineMap.size);
+				timeline.setScriptIndex(index);
+				int frameIndex = 0;
+				for (JsonValue valueMap = timelineMap.child; valueMap != null; valueMap = valueMap.next) {														
+					ScriptProperty[] propertyChanges = new ScriptProperty[valueMap.getChild("properties").size];
+					float time = timelineMap.getFloat("time");
+					int i = 0;
+					for (JsonValue propertyMap = valueMap.getChild("properties"); propertyMap != null; propertyMap = propertyMap.next) {					
+						ScriptPropertyType type = Enum.valueOf(ScriptPropertyType.class, propertyMap.getString("type"));
+						switch (type) {
+						case booleanType:
+							propertyChanges[i] = new BooleanScriptProperty(name, propertyMap.getBoolean("value"));
+							break;
+						case floatType:
+							propertyChanges[i] = new FloatScriptProperty(name, propertyMap.getFloat("value"));
+							break;
+						case stringType:
+							propertyChanges[i] = new StringScriptProperty(name, propertyMap.getString("value"));
+							break;
+						}
+						i++;
+					}
+					timeline.setFrame(frameIndex++, time, propertyChanges);				
+				}
+				timelines.add(timeline);
+				duration = Math.max(duration, timeline.getFrames()[timeline.getFrameCount() - 1]);
 			}
 		}
 

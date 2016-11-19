@@ -34,6 +34,7 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.FloatArray;
+import com.esotericsoftware.spine.ScriptData.ScriptProperty;
 import com.esotericsoftware.spine.attachments.Attachment;
 import com.esotericsoftware.spine.attachments.VertexAttachment;
 
@@ -162,7 +163,7 @@ public class Animation {
 	static private enum TimelineType {
 		rotate, translate, scale, shear, //
 		attachment, color, deform, //
-		event, drawOrder, //
+		event, drawOrder, script, //
 		ikConstraint, transformConstraint, //
 		pathConstraintPosition, pathConstraintSpacing, pathConstraintMix
 	}
@@ -833,6 +834,77 @@ public class Animation {
 				}
 			}
 		}
+	}
+	
+	static public class ScriptTimeline implements Timeline {
+		private final float[] frames;
+		private final ScriptProperty[][] scriptPropertyChanges;
+		int scriptIndex;
+		
+		public ScriptTimeline (int frameCount) {
+			this.frames = new float[frameCount];
+			this.scriptPropertyChanges = new ScriptProperty[frameCount][];
+		}
+		
+		public void setScriptIndex (int index) {
+			if (index < 0) throw new IllegalArgumentException("index must be >= 0.");
+			this.scriptIndex = index;
+		}
+		
+		public int getScriptIndex () {
+			return scriptIndex;
+		}
+		
+		public int getPropertyId () {
+			return TimelineType.script.ordinal() << 24;
+		}
+		
+		public int getFrameCount () {
+			return frames.length;
+		}
+		
+		public float[] getFrames () {
+			return frames;
+		}
+		
+		public ScriptProperty[][] getScriptPropertyChanges () {
+			return scriptPropertyChanges;
+		}
+		
+		public void setFrame (int frameIndex, float time, ScriptProperty[] scriptPropertyChange) {
+			frames[frameIndex] = time;
+			scriptPropertyChanges[frameIndex] = scriptPropertyChange;			
+		}
+		
+		public void apply (Skeleton skeleton, float lastTime, float time, Array<Event> firedEvents, float alpha, boolean setupPose,
+				boolean mixingOut) {
+
+				if (firedEvents == null) return;
+				float[] frames = this.frames;
+				int frameCount = frames.length;
+
+				if (lastTime > time) { // Fire events after last time for looped animations.
+					apply(skeleton, lastTime, Integer.MAX_VALUE, firedEvents, alpha, setupPose, mixingOut);
+					lastTime = -1f;
+				} else if (lastTime >= frames[frameCount - 1]) // Last time is after last frame.
+					return;
+				if (time < frames[0]) return; // Time is before first frame.
+
+				int frame;
+				if (lastTime < frames[0])
+					frame = 0;
+				else {
+					frame = binarySearch(frames, lastTime);
+					float frameTime = frames[frame];
+					while (frame > 0) { // Fire multiple events with the same frame.
+						if (frames[frame - 1] != frameTime) break;
+						frame--;
+					}
+				}
+				Script script = skeleton.scripts.get(scriptIndex);
+				for (; frame < frameCount && time >= frames[frame]; frame++)
+					script.updatePropertyValues(scriptPropertyChanges[frame]);
+			}
 	}
 
 	/** Fires an {@link Event} when specific animation times are reached. */

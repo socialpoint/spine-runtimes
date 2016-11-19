@@ -47,6 +47,7 @@ public class SkeletonData {
 	final Array<IkConstraintData> ikConstraints = new Array();
 	final Array<TransformConstraintData> transformConstraints = new Array();
 	final Array<PathConstraintData> pathConstraints = new Array();
+	final Array<ScriptData> scripts = new Array();
 	float width, height;
 	String version, hash;
 
@@ -217,6 +218,22 @@ public class SkeletonData {
 		for (int i = 0, n = pathConstraints.size; i < n; i++) {
 			PathConstraintData constraint = pathConstraints.get(i);
 			if (constraint.name.equals(constraintName)) return constraint;
+		}
+		return null;
+	}
+	
+	// --- Scripts
+	/** The skeleton's script constraints. */
+	public Array<ScriptData> getScripts () {
+		return scripts;
+	}
+	
+	public ScriptData findScript (String scriptName) {
+		if (scriptName == null) throw new IllegalArgumentException("scriptName cannot be null.");
+		Array<ScriptData> scripts = this.scripts;
+		for (int i = 0, n = scripts.size; i < n; i++) {
+			ScriptData script = scripts.get(i);
+			if (script.name.equals(scriptName)) return script;
 		}
 		return null;
 	}

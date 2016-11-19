@@ -52,6 +52,7 @@ public class Skeleton {
 	final Array<IkConstraint> ikConstraints;
 	final Array<TransformConstraint> transformConstraints;
 	final Array<PathConstraint> pathConstraints;
+	final Array<Script> scripts;
 	final Array<Updatable> updateCache = new Array();
 	final Array<Bone> updateCacheReset = new Array();
 	Skin skin;
@@ -98,6 +99,10 @@ public class Skeleton {
 		for (PathConstraintData pathConstraintData : data.pathConstraints)
 			pathConstraints.add(new PathConstraint(pathConstraintData, this));
 
+		scripts = new Array(data.scripts.size);
+		for (ScriptData scriptData : data.scripts)
+			scripts.add(new Script(scriptData, this));
+		
 		color = new Color(1, 1, 1, 1);
 
 		updateCache();
@@ -142,6 +147,10 @@ public class Skeleton {
 		pathConstraints = new Array(skeleton.pathConstraints.size);
 		for (PathConstraint pathConstraint : skeleton.pathConstraints)
 			pathConstraints.add(new PathConstraint(pathConstraint, this));
+		
+		scripts = new Array(skeleton.scripts.size);
+		for (Script script : skeleton.scripts)
+			scripts.add(new Script(script, this));
 
 		skin = skeleton.skin;
 		color = new Color(skeleton.color);
@@ -165,8 +174,9 @@ public class Skeleton {
 		Array<IkConstraint> ikConstraints = this.ikConstraints;
 		Array<TransformConstraint> transformConstraints = this.transformConstraints;
 		Array<PathConstraint> pathConstraints = this.pathConstraints;
-		int ikCount = ikConstraints.size, transformCount = transformConstraints.size, pathCount = pathConstraints.size;
-		int constraintCount = ikCount + transformCount + pathCount;
+		Array<Script> scripts = this.scripts;
+		int ikCount = ikConstraints.size, transformCount = transformConstraints.size, pathCount = pathConstraints.size, scriptCount = scripts.size;
+		int constraintCount = ikCount + transformCount + pathCount + scriptCount;
 		outer:
 		for (int i = 0; i < constraintCount; i++) {
 			for (int ii = 0; ii < ikCount; ii++) {
@@ -190,6 +200,13 @@ public class Skeleton {
 					continue outer;
 				}
 			}
+			for (int ii = 0; ii < scriptCount; ii++) {
+				Script script = scripts.get(ii);
+				if (script.data.order == i) {
+					sortScript(script);
+					continue outer;
+				}
+			}			
 		}
 
 		for (int i = 0, n = bones.size; i < n; i++)
@@ -255,6 +272,23 @@ public class Skeleton {
 			sortReset(constrained.get(ii).children);
 		for (int ii = 0; ii < boneCount; ii++)
 			constrained.get(ii).sorted = true;
+	}
+	
+	private void sortScript (Script constraint) {
+		// FIXME constraints have to specify the bones they influence I guess?
+		// sortBone(constraint.target);
+
+//		Array<Bone> constrained = constraint.bones;
+//		int boneCount = constrained.size;
+//		for (int ii = 0; ii < boneCount; ii++)
+//			sortBone(constrained.get(ii));
+
+		updateCache.add(constraint);
+
+//		for (int ii = 0; ii < boneCount; ii++)
+//			sortReset(constrained.get(ii).children);
+//		for (int ii = 0; ii < boneCount; ii++)
+//			constrained.get(ii).sorted = true;
 	}
 
 	private void sortPathConstraintAttachment (Skin skin, int slotIndex, Bone slotBone) {
@@ -559,6 +593,21 @@ public class Skeleton {
 		for (int i = 0, n = pathConstraints.size; i < n; i++) {
 			PathConstraint constraint = pathConstraints.get(i);
 			if (constraint.data.name.equals(constraintName)) return constraint;
+		}
+		return null;
+	}
+	
+	/** The skeleton's scripts. */
+	public Array<Script> getScripts () {
+		return scripts;		
+	}
+	
+	public Script findScript (String scriptName) {
+		if (scriptName == null) throw new IllegalArgumentException("scriptName cannot be null.");
+		Array<Script> scripts = this.scripts;
+		for (int i = 0, n = scripts.size; i < n; i++) {
+			Script script = scripts.get(i);
+			if (script.data.name.equals(scriptName)) return script;
 		}
 		return null;
 	}
