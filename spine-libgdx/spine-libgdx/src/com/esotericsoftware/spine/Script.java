@@ -29,6 +29,7 @@ public class Script implements Constraint {
 	}
 	
 	private void copyProperties (ObjectMap<String, ScriptProperty> properties) {
+		this.properties.clear();
 		for (ScriptProperty property : properties.values()) {
 			if (property instanceof BooleanScriptProperty) {
 				BooleanScriptProperty p = (BooleanScriptProperty)property;
