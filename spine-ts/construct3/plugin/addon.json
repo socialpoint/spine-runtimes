@@ -1,0 +1,26 @@
+﻿{
+	"is-c3-addon": true,
+	"type": "plugin",
+	"name": "Spine plugin",
+	"id": "SpinePlugin",
+	"version": "1.0.0.0",
+	"author": "Esoteric Software",
+	"website": "https://esotericsoftware.com",
+	"documentation": "https://esotericsoftware.com",
+	"description": "Spine Construct 3 plugin.",
+	"editor-scripts": [
+						"plugin.js",
+						"type.js",
+						"instance.js"
+					],
+	"file-list": [
+		"c2runtime/runtime.js",
+		"lang/en-US.json",
+		"aces.json",
+		"addon.json",
+		"icon.svg",		
+		"plugin.js",
+		"type.js",
+		"instance.js"
+	]
+}
