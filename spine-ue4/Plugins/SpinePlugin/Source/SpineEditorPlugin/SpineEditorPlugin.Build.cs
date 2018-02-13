@@ -15,8 +15,9 @@ namespace UnrealBuildTool.Rules
                 "CoreUObject",
                 "Engine",
                 "UnrealEd",
-                "SpinePlugin"
-            });
+                "SpinePlugin",
+				"UMG", "Slate", "SlateCore"
+			});
             
             PublicIncludePathModuleNames.AddRange(new string[] {
                "AssetTools",
