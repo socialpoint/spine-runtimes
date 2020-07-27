@@ -4,19 +4,35 @@ This GitHub project is a fork from the [Spine Runtimes](https://github.com/Esote
 
 ## Structure
 
-The Spine folder that we are interested in are in two sub folders:
-* spine-runtimes\spine-cpp
-* spine-runtimes\spine-cocos2dx
+The Spine files that we are interested in are in specific subfolders:
+* {ESOTERIC_REPO}/spine-cpp/include/spine
+* {ESOTERIC_REPO}/spine-cpp/src/spine
+* {ESOTERIC_REPO}/spine-cocos2dx/src/spine
+* {ESOTERIC_REPO}/spine-cocos2dx/src/spine/v3
 
-# source: 6/06/19 14:13 ad60096eb1717a08db458d266bcd293b11d7b0ad ad60096 - Merge branch '3.8-beta' of https://github.com/EsotericSoftware/spine-runtimes into 3.8-beta
-# added: 8/08/19 12:19 	20ec19837942f401b50963f9d93ecd27c11e21b1 20ec198 - Support Spine 3.8
+and the cocos repo looks like that for now
+* {COCOS_REPO}/cocos/editor-support/spine
 
-DEST={YOURFOLDER}\sp-cocos2d-x-v3\cocos\editor-support\spine
+TODO: use the same structure as esoteric/spine in our cocos2dx folder
 
-Copy {YOURFOLDER}\spine-runtimes\spine-cpp\spine-cpp\include\spine {DEST}
-Copy {YOURFOLDER}\spine-runtimes\spine-cpp\spine-cpp\src\spine {DEST}
-Copy {YOURFOLDER}\spine-runtimes\spine-cocos2dx\src\spine {DEST}
+## Versions (from esoteric) used to sync the fork
 
-Version Spine 3.8 from 24th of July 14:25 SHA: 3be202711cffbc82bbf730133a19101bd128822d
+3be202711cffbc82bbf730133a19101bd128822d : 24/07/20 14:25 1st clean version since 2 years :)
+ad60096eb1717a08db458d266bcd293b11d7b0ad : 06/06/19 14:13 This was the moment Stefano did a merge directly into cocos/editor-support/spine without updating this repo. He also did a port directly to Esoteric
+
+## github helper
+
+How to work with a fork: instead of researching all the time how to work with a fork because I don't do that daily, here is a recap of last time update
+
+git clone --progress --verbose --recurse-submodules git@github.com:socialpoint/spine-runtimes.git "C:\Prog\sp-spine-runtimes"
+git remote -v
+git remote add esoteric git@github.com:EsotericSoftware/spine-runtimes.git
+git fetch esoteric
+git checkout esoteric/3.8
+git remote rm esoteric
+
+do what you need to do
+
+git push origin/3.8
 
 
