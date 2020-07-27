@@ -36,8 +36,8 @@
 #include <spine/SkeletonRenderer.h>
 
 #if COCOS2D_VERSION < 0x00040000
-#include <spine/v3/SkeletonBatch.h>
-#include <spine/v3/SkeletonTwoColorBatch.h>
+#include <spine/SkeletonBatch.h>     // [SP] Bertrand: flat structure
+#include <spine/SkeletonTwoColorBatch.h> // [SP] Bertrand: flat structure
 #else
 #include <spine/v4/SkeletonBatch.h>
 #include <spine/v4/SkeletonTwoColorBatch.h>

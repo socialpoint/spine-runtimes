@@ -255,6 +255,7 @@ namespace spine {
 	}
 
 	void SkeletonRenderer::draw (Renderer* renderer, const Mat4& transform, uint32_t transformFlags) {
+        _isAutoCulled = false; // [SP]
 		// Early exit if the skeleton is invisible
 		if (getDisplayedOpacity() == 0 || _skeleton->getColor().a == 0) {
 			return;
@@ -271,9 +272,13 @@ namespace spine {
 
 		#if CC_USE_CULLING
 		const cocos2d::Rect bb = computeBoundingRect(worldCoords, coordCount / 2);
+		_boundingRect = bb;
 
-		if (cullRectangle(renderer, transform, bb)) {
+		const bool autoCullingEnable = cocos2d::Director::getInstance()->isAutoCullingEnable();
+        const Camera* camera = Camera::getVisitingCamera();
+		if (autoCullingEnable && camera && cullRectangle(renderer, transform, bb)) {
 			VLA_FREE(worldCoords);
+            _isAutoCulled = true;
 			return;
 		}
 		#endif
@@ -616,6 +621,10 @@ namespace spine {
 	}
 
 
+    bool SkeletonRenderer::isAutoCulled () const {
+        return _isAutoCulled;
+    }
+
 	void SkeletonRenderer::drawDebug (Renderer* renderer, const Mat4 &transform, uint32_t transformFlags) {
 
 #if !defined(USE_MATRIX_STACK_PROJECTION_ONLY)
@@ -747,6 +756,7 @@ namespace spine {
 		const cocos2d::Rect bb = computeBoundingRect(worldCoords, coordCount / 2);
 		VLA_FREE(worldCoords);
 		return bb;
+        // return _boundingRect; [SP] check if it's enough?
 	}
 
 	// --- Convenience methods for Skeleton_* functions.

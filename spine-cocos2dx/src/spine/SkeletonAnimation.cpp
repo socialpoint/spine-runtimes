@@ -130,7 +130,7 @@ SkeletonAnimation::~SkeletonAnimation () {
 }
 
 void SkeletonAnimation::update (float deltaTime) {
-	if (_updateOnlyIfVisible && !isVisible()) return;
+    if (_updateOnlyIfVisible && (isAutoCulled() || !isVisible())) return; // [SP] added by Roberto
 
 	super::update(deltaTime);
 

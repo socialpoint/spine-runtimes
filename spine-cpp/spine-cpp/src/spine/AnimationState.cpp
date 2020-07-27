@@ -292,6 +292,7 @@ const int Subsequent = 0;
 const int First = 1;
 const int Hold = 2;
 const int HoldMix = 3;
+const int NotLast = 4; // [SP] added by Stefano
 
 const int Setup = 1;
 const int Current = 2;
@@ -441,7 +442,7 @@ bool AnimationState::apply(Skeleton &skeleton) {
 				Timeline *timeline = timelines[ii];
 				assert(timeline);
 
-				MixBlend timelineBlend = timelineMode[ii] == Subsequent ? blend : MixBlend_Setup;
+				MixBlend timelineBlend = (timelineMode[ii] & (NotLast - 1)) == Subsequent ? blend : MixBlend_Setup;  // [SP] added by Stefano 
 
 				if (timeline->getRTTI().isExactly(RotateTimeline::rtti))
 					applyRotateTimeline(static_cast<RotateTimeline *>(timeline), skeleton, animationTime, mix, timelineBlend, timelinesRotation, ii << 1, firstFrame);
@@ -826,8 +827,12 @@ float AnimationState::applyMixingFrom(TrackEntry *to, Skeleton &skeleton, MixBle
 			MixDirection direction = MixDirection_Out;
 			MixBlend timelineBlend;
 			float alpha;
-			switch (timelineMode[i]) {
+			switch (timelineMode[i] & (NotLast - 1)) { // [SP] added by Stefano
 				case Subsequent:
+					if (!attachments && (timeline->getRTTI().isExactly(AttachmentTimeline::rtti))) { // [SP] added by Stefano
+						if ((timelineMode[i] & NotLast) == NotLast) continue; // [SP] added by Stefano
+						blend = MixBlend_Setup; // [SP] added by Stefano
+					}
 					if (!drawOrder && (timeline->getRTTI().isExactly(DrawOrderTimeline::rtti))) continue;
                     timelineBlend = blend;
 					alpha = alphaMix;
@@ -993,6 +998,16 @@ void AnimationState::animationsChanged() {
 			entry = entry->_mixingTo;
 		} while (entry != NULL);
 	}
+
+	// [SP] added by Stefano
+	_propertyIDs.clear();
+	for (int i = (int)_tracks.size() - 1; i >= 0; i--) {
+		TrackEntry *entry = _tracks[i];
+		while (entry) {
+			computeNotLast(entry);
+			entry = entry->_mixingFrom;
+		}
+	}
 }
 
 void AnimationState::computeHold(TrackEntry *entry) {
@@ -1044,3 +1059,31 @@ void AnimationState::computeHold(TrackEntry *entry) {
 		}
 	}
 }
+
+void AnimationState::computeNotLast(TrackEntry *entry) {
+	Vector<Timeline *> &timelines = entry->_animation->_timelines;
+	size_t timelinesCount = timelines.size();
+	Vector<int> &timelineMode = entry->_timelineMode;
+
+	for (size_t i = 0; i < timelinesCount; i++) {
+		if (timelines[i]->getRTTI().isExactly(AttachmentTimeline::rtti)) {
+			AttachmentTimeline *timeline = static_cast<AttachmentTimeline *>(timelines[i]);
+			if (!_propertyIDs.containsKey(timeline->getSlotIndex())) {
+				_propertyIDs.put(timeline->getSlotIndex(), true);
+				timelineMode[i] |= NotLast;
+			}
+		}
+	}
+}
+
+/* [SP] removed from SPINE, I need to check we are not using them
+bool AnimationState::hasTimeline(TrackEntry* entry, int inId) {
+	Vector<Timeline *> &timelines = entry->_animation->_timelines;
+	for (size_t i = 0, n = timelines.size(); i < n; ++i) {
+		if (timelines[i]->getPropertyId() == inId) {
+			return true;
+		}
+	}
+	return false;
+}
+*/

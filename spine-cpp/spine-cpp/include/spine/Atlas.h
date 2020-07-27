@@ -106,6 +106,7 @@ public:
 
 	~Atlas();
 
+    void loadTextures(); // [SP] added by Stefano
 	void flipV();
 
 	/// Returns the first region found with the specified name. This method uses String comparison to find the region, so the result

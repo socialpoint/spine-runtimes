@@ -304,6 +304,7 @@ int Skeleton::findSlotIndex(const String &slotName) {
 
 void Skeleton::setSkin(const String &skinName) {
 	Skin *foundSkin = skinName.isEmpty() ? NULL : _data->findSkin(skinName);
+	assert(foundSkin != NULL); // [SP] this should not happened, but setSkin will not break?
 	setSkin(foundSkin);
 }
 
@@ -349,7 +350,7 @@ Attachment *Skeleton::getAttachment(int slotIndex, const String &attachmentName)
 	return _data->getDefaultSkin() != NULL ? _data->getDefaultSkin()->getAttachment(slotIndex, attachmentName) : NULL;
 }
 
-void Skeleton::setAttachment(const String &slotName, const String &attachmentName) {
+bool Skeleton::setAttachment(const String &slotName, const String &attachmentName) { // [SP] added by Stefano
 	assert(slotName.length() > 0);
 
 	for (size_t i = 0, n = _slots.size(); i < n; ++i) {
@@ -364,13 +365,14 @@ void Skeleton::setAttachment(const String &slotName, const String &attachmentNam
 
 			slot->setAttachment(attachment);
 
-			return;
+			return true; // [SP] added by Stefano
 		}
 	}
 
 	printf("Slot not found: %s", slotName.buffer());
 
 	assert(false);
+	return false; // [SP] added by Stefano
 }
 
 IkConstraint *Skeleton::findIkConstraint(const String &constraintName) {

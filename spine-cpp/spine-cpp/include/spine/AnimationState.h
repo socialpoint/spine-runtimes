@@ -434,6 +434,10 @@ namespace spine {
 		void computeHold(TrackEntry *entry);
 
         void setAttachment(Skeleton &skeleton, spine::Slot &slot, const String &attachmentName, bool attachments);
+		
+        void computeNotLast(TrackEntry *entry);
+		// [SP] removed from SPINE, I need to check we are not using them
+        // bool hasTimeline(TrackEntry *entry, int inId);
     };
 }
 

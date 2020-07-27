@@ -488,6 +488,10 @@ Attachment *SkeletonBinary::readAttachment(DataInput *input, Skin *skin, int slo
 		String path(readStringRef(input, skeletonData));
 		if (path.isEmpty()) path = name;
 		RegionAttachment *region = _attachmentLoader->newRegionAttachment(*skin, String(name), String(path));
+		if(!region) // [SP] anti bug if there is no region, added by Arnau
+		{
+			return nullptr;
+		}
 		region->_path = path;
 		region->_rotation = readFloat(input);
 		region->_x = readFloat(input) * _scale;

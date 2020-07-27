@@ -79,6 +79,17 @@ Atlas::~Atlas() {
 	ContainerUtil::cleanUpVectorOfPointers(_regions);
 }
 
+// [SP] added by Stefano
+void Atlas::loadTextures() {
+	if (_textureLoader) {
+		for (size_t i = 0, n = _pages.size(); i < n; ++i) {
+			AtlasPage* const page = _pages[i];
+			if (!page->texturePath.isEmpty()) {
+				_textureLoader->load(*page, page->texturePath);
+			}
+		}
+	}
+}
 void Atlas::flipV() {
 	for (size_t i = 0, n = _regions.size(); i < n; ++i) {
 		AtlasRegion *regionP = _regions[i];

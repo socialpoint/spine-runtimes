@@ -143,7 +143,7 @@ public:
 	Attachment *getAttachment(int slotIndex, const String &attachmentName);
 
 	/// @param attachmentName May be empty.
-	void setAttachment(const String &slotName, const String &attachmentName);
+	bool setAttachment(const String &slotName, const String &attachmentName); // [SP] added by Stefano
 
 	/// @return May be NULL.
 	IkConstraint *findIkConstraint(const String &constraintName);
