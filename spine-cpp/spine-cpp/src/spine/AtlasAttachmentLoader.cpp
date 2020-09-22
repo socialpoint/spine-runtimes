@@ -74,7 +74,10 @@ MeshAttachment *AtlasAttachmentLoader::newMeshAttachment(Skin &skin, const Strin
 	SP_UNUSED(skin);
 
 	AtlasRegion *regionP = findRegion(path);
-	if (!regionP) return NULL;
+	if (!regionP) 
+	{
+		return NULL;
+	}
 
 	AtlasRegion &region = *regionP;
 

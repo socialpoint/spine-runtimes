@@ -72,7 +72,7 @@ namespace spine {
 
 		~SkeletonBinary();
 
-		SkeletonData* readSkeletonData(const unsigned char* binary, int length);
+		SkeletonData* readSkeletonData(const unsigned char* binary, int length, const String& path);
 
 		SkeletonData* readSkeletonDataFile(const String& path);
 
@@ -82,8 +82,16 @@ namespace spine {
 
 	private:
 		struct DataInput : public SpineObject {
-			const unsigned char* cursor;
-			const unsigned char* end;
+		public:
+			DataInput(const unsigned char* binary, const int length, const String& path): m_cursor(binary), m_end(binary+length), m_path(path) {}
+
+			const unsigned char* getCursorAndUpdate(int length); // [SP] return nullptr if going too far, you need to test for error
+			const String& getPath() const { return m_path; }
+
+		protected: 
+			const unsigned char* m_cursor;
+			const unsigned char* m_end;
+			const String& m_path;
 		};
 
 		AttachmentLoader* _attachmentLoader;

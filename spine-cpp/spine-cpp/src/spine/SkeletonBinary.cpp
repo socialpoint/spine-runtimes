@@ -73,6 +73,7 @@
 #include <spine/DrawOrderTimeline.h>
 #include <spine/EventTimeline.h>
 #include <spine/Event.h>
+#include <memory> // [SP] std::make_unique
 
 using namespace spine;
 
@@ -93,6 +94,37 @@ const int SkeletonBinary::CURVE_LINEAR = 0;
 const int SkeletonBinary::CURVE_STEPPED = 1;
 const int SkeletonBinary::CURVE_BEZIER = 2;
 
+// [SP] comment next line (or undef it later or put 0) if you don't want to check for issues while reading a SkeletonBinary
+#define SP_CHECK_FOR_ISSUES 1
+
+#if !defined(SP_CHECK_FOR_ISSUES) 
+	#if defined(_DEBUG)
+	#define SP_CHECK_FOR_ISSUES 1
+	#endif
+#endif
+
+#if defined(SP_CHECK_FOR_ISSUES) && (SP_CHECK_FOR_ISSUES==1)
+#define SP_CHECK() do { if(!_error.isEmpty()) return NULL; } while(0)
+#else
+#define SP_CHECK() ((void)0)
+#endif
+
+// return NULL if it's going too far
+const unsigned char* SkeletonBinary::DataInput::getCursorAndUpdate(int length) {
+	const unsigned char* start = m_cursor;
+#if defined(SP_CHECK_FOR_ISSUES) && (SP_CHECK_FOR_ISSUES==1)
+	const unsigned char* end = start + length;
+	if(end <= m_end) {
+		m_cursor = end;
+		return start;
+	}
+	return NULL;
+#else
+	m_cursor += length;
+	return start;
+#endif
+}
+
 SkeletonBinary::SkeletonBinary(Atlas *atlasArray) : _attachmentLoader(
 		new(__FILE__, __LINE__) AtlasAttachmentLoader(atlasArray)), _error(), _scale(1), _ownsLoader(true) {
 
@@ -111,29 +143,29 @@ SkeletonBinary::~SkeletonBinary() {
 	if (_ownsLoader) delete _attachmentLoader;
 }
 
-SkeletonData *SkeletonBinary::readSkeletonData(const unsigned char *binary, const int length) {
+SkeletonData *SkeletonBinary::readSkeletonData(const unsigned char *binary, const int length, const String& path) {
 	bool nonessential;
 	SkeletonData *skeletonData;
 
-	DataInput *input = new(__FILE__, __LINE__) DataInput();
-	input->cursor = binary;
-	input->end = binary + length;
+	auto scopedInput = std::make_unique<DataInput>(binary, length, path);
+	auto input = scopedInput.get();
 
 	_linkedMeshes.clear();
 
-	skeletonData = new(__FILE__, __LINE__) SkeletonData();
+	auto scopedSkeletonData = std::make_unique<SkeletonData>();
+	skeletonData = scopedSkeletonData.get();
 
 	char *skeletonData_hash = readString(input);
+	SP_CHECK();
 	skeletonData->_hash.own(skeletonData_hash);
 
 	char *skeletonData_version = readString(input);
+	SP_CHECK();
 	skeletonData->_version.own(skeletonData_version);
-    if ("3.8.75" == skeletonData->_version) {
-        delete input;
-        delete skeletonData;
-        setError("Unsupported skeleton data, please export with a newer version of Spine.", "");
-        return NULL;
-    }
+	if ("3.8.75" == skeletonData->_version) {
+		setError("Unsupported skeleton data, please export with a newer version of Spine.", "");
+		return NULL;
+	}
 
 	skeletonData->_x = readFloat(input);
 	skeletonData->_y = readFloat(input);
@@ -153,6 +185,7 @@ SkeletonData *SkeletonBinary::readSkeletonData(const unsigned char *binary, cons
 	for (int i = 0; i < numStrings; i++)
 		skeletonData->_strings.add(readString(input));
 
+	SP_CHECK();
 	/* Bones. */
 	int numBones = readVarint(input, true);
 	skeletonData->_bones.setSize(numBones, 0);
@@ -174,13 +207,16 @@ SkeletonData *SkeletonBinary::readSkeletonData(const unsigned char *binary, cons
 		skeletonData->_bones[i] = data;
 	}
 
+	SP_CHECK();
 	/* Slots. */
 	int slotsCount = readVarint(input, true);
 	skeletonData->_slots.setSize(slotsCount, 0);
 	for (int i = 0; i < slotsCount; ++i) {
 		const char *slotName = readString(input);
+		SP_CHECK();
 		BoneData *boneData = skeletonData->_bones[readVarint(input, true)];
-		SlotData *slotData = new(__FILE__, __LINE__) SlotData(i, String(slotName, true), *boneData);
+		auto scopedSlotData = std::make_unique<SlotData>(i, String(slotName, true), *boneData);
+		auto slotData = scopedSlotData.get();
 
 		readColor(input, slotData->getColor());
 		unsigned char r = readByte(input);
@@ -192,15 +228,18 @@ SkeletonData *SkeletonBinary::readSkeletonData(const unsigned char *binary, cons
 			slotData->setHasDarkColor(true);
 		}
 		slotData->_attachmentName = readStringRef(input, skeletonData);
+		SP_CHECK();
 		slotData->_blendMode = static_cast<BlendMode>(readVarint(input, true));
-		skeletonData->_slots[i] = slotData;
+		skeletonData->_slots[i] = scopedSlotData.release();
 	}
 
+	SP_CHECK();
 	/* IK constraints. */
 	int ikConstraintsCount = readVarint(input, true);
 	skeletonData->_ikConstraints.setSize(ikConstraintsCount, 0);
 	for (int i = 0; i < ikConstraintsCount; ++i) {
 		const char *name = readString(input);
+		SP_CHECK();
 		IkConstraintData *data = new(__FILE__, __LINE__) IkConstraintData(String(name, true));
 		data->setOrder(readVarint(input, true));
 		data->setSkinRequired(readBoolean(input));
@@ -218,12 +257,15 @@ SkeletonData *SkeletonBinary::readSkeletonData(const unsigned char *binary, cons
 		skeletonData->_ikConstraints[i] = data;
 	}
 
+	SP_CHECK();
 	/* Transform constraints. */
 	int transformConstraintsCount = readVarint(input, true);
 	skeletonData->_transformConstraints.setSize(transformConstraintsCount, 0);
 	for (int i = 0; i < transformConstraintsCount; ++i) {
 		const char *name = readString(input);
-		TransformConstraintData *data = new(__FILE__, __LINE__) TransformConstraintData(String(name, true));
+		SP_CHECK();
+		auto scopedData = std::make_unique<TransformConstraintData>(String(name, true));
+		auto data = scopedData.get();
 		data->setOrder(readVarint(input, true));
 		data->setSkinRequired(readBoolean(input));
 		int bonesCount = readVarint(input, true);
@@ -243,15 +285,19 @@ SkeletonData *SkeletonBinary::readSkeletonData(const unsigned char *binary, cons
 		data->_translateMix = readFloat(input);
 		data->_scaleMix = readFloat(input);
 		data->_shearMix = readFloat(input);
-		skeletonData->_transformConstraints[i] = data;
+		SP_CHECK();
+		skeletonData->_transformConstraints[i] = scopedData.release();
 	}
 
+	SP_CHECK();
 	/* Path constraints */
 	int pathConstraintsCount = readVarint(input, true);
 	skeletonData->_pathConstraints.setSize(pathConstraintsCount, 0);
 	for (int i = 0; i < pathConstraintsCount; ++i) {
 		const char *name = readString(input);
-		PathConstraintData *data = new(__FILE__, __LINE__) PathConstraintData(String(name, true));
+		SP_CHECK();
+		auto scopedData = std::make_unique<PathConstraintData>(String(name, true));
+		auto data = scopedData.get();
 		data->setOrder(readVarint(input, true));
 		data->setSkinRequired(readBoolean(input));
 		int bonesCount = readVarint(input, true);
@@ -270,9 +316,11 @@ SkeletonData *SkeletonBinary::readSkeletonData(const unsigned char *binary, cons
 			data->_spacing *= _scale;
 		data->_rotateMix = readFloat(input);
 		data->_translateMix = readFloat(input);
-		skeletonData->_pathConstraints[i] = data;
+		SP_CHECK();
+		skeletonData->_pathConstraints[i] = scopedData.release();
 	}
 
+	SP_CHECK();
 	/* Default skin. */
 	Skin* defaultSkin = readSkin(input, true, skeletonData, nonessential);
 	if (defaultSkin) {
@@ -280,25 +328,23 @@ SkeletonData *SkeletonBinary::readSkeletonData(const unsigned char *binary, cons
 		skeletonData->_skins.add(defaultSkin);
 	}
 
+	SP_CHECK();
 	/* Skins. */
 	for (size_t i = 0, n = (size_t)readVarint(input, true); i < n; ++i)
 		skeletonData->_skins.add(readSkin(input, false, skeletonData, nonessential));
 
+	SP_CHECK();
 	/* Linked meshes. */
 	for (int i = 0, n = _linkedMeshes.size(); i < n; ++i) {
 		LinkedMesh *linkedMesh = _linkedMeshes[i];
 		Skin *skin = linkedMesh->_skin.length() == 0 ? skeletonData->getDefaultSkin() : skeletonData->findSkin(
 			linkedMesh->_skin);
 		if (skin == NULL) {
-			delete input;
-			delete skeletonData;
 			setError("Skin not found: ", linkedMesh->_skin.buffer());
 			return NULL;
 		}
 		Attachment *parent = skin->getAttachment(linkedMesh->_slotIndex, linkedMesh->_parent);
 		if (parent == NULL) {
-			delete input;
-			delete skeletonData;
 			setError("Parent mesh not found: ", linkedMesh->_parent.buffer());
 			return NULL;
 		}
@@ -310,12 +356,15 @@ SkeletonData *SkeletonBinary::readSkeletonData(const unsigned char *binary, cons
 	ContainerUtil::cleanUpVectorOfPointers(_linkedMeshes);
 	_linkedMeshes.clear();
 
+	SP_CHECK();
 	/* Events. */
 	int eventsCount = readVarint(input, true);
 	skeletonData->_events.setSize(eventsCount, 0);
 	for (int i = 0; i < eventsCount; ++i) {
 		const char *name = readStringRef(input, skeletonData);
-		EventData *eventData = new(__FILE__, __LINE__) EventData(String(name));
+		SP_CHECK();
+		auto scopedEventData = std::make_unique<EventData>(String(name));
+		auto eventData = scopedEventData.get();
 		eventData->_intValue = readVarint(input, false);
 		eventData->_floatValue = readFloat(input);
 		eventData->_stringValue.own(readString(input));
@@ -324,9 +373,11 @@ SkeletonData *SkeletonBinary::readSkeletonData(const unsigned char *binary, cons
 			eventData->_volume = readFloat(input);
 			eventData->_balance = readFloat(input);
 		}
-		skeletonData->_events[i] = eventData;
+		SP_CHECK();
+		skeletonData->_events[i] = scopedEventData.release();
 	}
 
+	SP_CHECK();
 	/* Animations. */
 	int animationsCount = readVarint(input, true);
 	skeletonData->_animations.setSize(animationsCount, 0);
@@ -334,15 +385,13 @@ SkeletonData *SkeletonBinary::readSkeletonData(const unsigned char *binary, cons
 		String name(readString(input), true);
 		Animation *animation = readAnimation(name, input, skeletonData);
 		if (!animation) {
-			delete input;
-			delete skeletonData;
 			return NULL;
 		}
 		skeletonData->_animations[i] = animation;
 	}
 
-	delete input;
-	return skeletonData;
+	SP_CHECK();
+	return scopedSkeletonData.release();
 }
 
 SkeletonData *SkeletonBinary::readSkeletonDataFile(const String &path) {
@@ -353,12 +402,13 @@ SkeletonData *SkeletonBinary::readSkeletonDataFile(const String &path) {
 		setError("Unable to read skeleton file: ", path.buffer());
 		return NULL;
 	}
-	skeletonData = readSkeletonData((unsigned char *) binary, length);
+	skeletonData = readSkeletonData((unsigned char *) binary, length, path); // [SP] add name of file so we can log on error);
 	SpineExtension::free(binary, __FILE__, __LINE__);
 	return skeletonData;
 }
 
 void SkeletonBinary::setError(const char *value1, const char *value2) {
+	if (!_error.isEmpty()) return; // [SP] don't override error string if there is already one
 	char message[256];
 	int length;
 	strcpy(message, value1);
@@ -369,18 +419,41 @@ void SkeletonBinary::setError(const char *value1, const char *value2) {
 
 char *SkeletonBinary::readString(DataInput *input) {
 	int length = readVarint(input, true);
+	SP_CHECK();
 	char *string;
 	if (length == 0) return NULL;
+	if (length < 0) {
+		setError("no string have a negative length ", input->getPath().buffer());
+		return NULL;
+	}
+	const unsigned char* start = input->getCursorAndUpdate(length-1);
+	if(!start) {
+		setError("Going past the buffer for a string on file ", input->getPath().buffer());
+		return NULL;
+	}
 	string = SpineExtension::alloc<char>(length, __FILE__, __LINE__);
-	memcpy(string, input->cursor, length - 1);
-	input->cursor += length - 1;
+	if(!string) {
+		setError("Can't alloc string on file ", input->getPath().buffer());
+		return NULL;
+	}
+	memcpy(string, start, length - 1);
 	string[length - 1] = '\0';
 	return string;
 }
 
 char* SkeletonBinary::readStringRef(DataInput* input, SkeletonData* skeletonData) {
 	int index = readVarint(input, true);
-	return index == 0 ? nullptr : skeletonData->_strings[index - 1];
+	SP_CHECK();
+	if(index == 0) return NULL;
+	if(index < 0) {
+		setError("Negative value as index is not got for a vector on file ", input->getPath().buffer());
+		return NULL;
+	}
+	if(index - 1 > (int)skeletonData->_strings.size()) {
+		setError("Index bigger than array on file ", input->getPath().buffer());
+		return NULL;
+	}
+	return skeletonData->_strings[index - 1];  // [SP] previously line 383, associated with lots of crashing
 }
 
 float SkeletonBinary::readFloat(DataInput *input) {
@@ -393,7 +466,15 @@ float SkeletonBinary::readFloat(DataInput *input) {
 }
 
 unsigned char SkeletonBinary::readByte(DataInput *input) {
-	return *input->cursor++;
+	const unsigned char* start = input->getCursorAndUpdate(1);
+#if defined(SP_CHECK_FOR_ISSUES) && (SP_CHECK_FOR_ISSUES==1)
+	if(start != NULL)
+		return *start;
+	setError("Going past the buffer on read byte on file ", input->getPath().buffer());
+	return 0;
+#else
+	return *start;
+#endif
 }
 
 signed char SkeletonBinary::readSByte(DataInput *input) {
@@ -447,10 +528,16 @@ Skin *SkeletonBinary::readSkin(DataInput *input, bool defaultSkin, SkeletonData 
 	int slotCount = 0;
 	if (defaultSkin) {
 		slotCount = readVarint(input, true);
+		SP_CHECK();
 		if (slotCount == 0) return NULL;
 		skin = new(__FILE__, __LINE__) Skin("default");
 	} else {
-		skin = new(__FILE__, __LINE__) Skin(readStringRef(input, skeletonData));
+		char* str = readStringRef(input, skeletonData);
+		SP_CHECK();
+		skin = new(__FILE__, __LINE__) Skin(str);
+	}
+	std::unique_ptr<Skin> scopedSkin(skin);
+	if(!defaultSkin) {
 		for (int i = 0, n = readVarint(input, true); i < n; i++)
 			skin->getBones().add(skeletonData->_bones[readVarint(input, true)]);
 
@@ -465,32 +552,37 @@ Skin *SkeletonBinary::readSkin(DataInput *input, bool defaultSkin, SkeletonData 
 		slotCount = readVarint(input, true);
 	}
 
+	SP_CHECK();
 	for (int i = 0; i < slotCount; ++i) {
 		int slotIndex = readVarint(input, true);
 		for (int ii = 0, nn = readVarint(input, true); ii < nn; ++ii) {
 			String name(readStringRef(input, skeletonData));
+			SP_CHECK();
 			Attachment *attachment = readAttachment(input, skin, slotIndex, name, skeletonData, nonessential);
 			if (attachment) skin->setAttachment(slotIndex, String(name), attachment);
 		}
 	}
-	return skin;
+	SP_CHECK();
+	return scopedSkin.release();
 }
 
 Attachment *SkeletonBinary::readAttachment(DataInput *input, Skin *skin, int slotIndex, const String &attachmentName,
 	SkeletonData *skeletonData, bool nonessential
 ) {
 	String name(readStringRef(input, skeletonData));
+	SP_CHECK();
 	if (name.isEmpty()) name = attachmentName;
 
 	AttachmentType type = static_cast<AttachmentType>(readByte(input));
 	switch (type) {
 	case AttachmentType_Region: {
 		String path(readStringRef(input, skeletonData));
+		SP_CHECK();
 		if (path.isEmpty()) path = name;
 		RegionAttachment *region = _attachmentLoader->newRegionAttachment(*skin, String(name), String(path));
-		if(!region) // [SP] anti bug if there is no region, added by Arnau
-		{
-			return nullptr;
+		if(!region) {// [SP] anti bug if there is no region, added by Arnau
+			setError("AttachmentType_Region problem on skin ", input->getPath().buffer());
+			return NULL;
 		}
 		region->_path = path;
 		region->_rotation = readFloat(input);
@@ -520,9 +612,14 @@ Attachment *SkeletonBinary::readAttachment(DataInput *input, Skin *skin, int slo
 		int vertexCount;
 		MeshAttachment *mesh;
 		String path(readStringRef(input, skeletonData));
+		SP_CHECK();
 		if (path.isEmpty()) path = name;
 
 		mesh = _attachmentLoader->newMeshAttachment(*skin, String(name), String(path));
+		if(!mesh) {// [SP] Anti bug if there is no mesh
+			setError("AttachmentType_Mesh problem on skin.", input->getPath().buffer());
+			return NULL; 
+		}
 		mesh->_path = path;
 		readColor(input, mesh->getColor());
 		vertexCount = readVarint(input, true);
@@ -544,13 +641,20 @@ Attachment *SkeletonBinary::readAttachment(DataInput *input, Skin *skin, int slo
 	}
 	case AttachmentType_Linkedmesh: {
 		String path(readStringRef(input, skeletonData));
+		SP_CHECK();
 		if (path.isEmpty()) path = name;
 
 		MeshAttachment *mesh = _attachmentLoader->newMeshAttachment(*skin, String(name), String(path));
+		if(!mesh) {// [SP] Anti bug if there is no mesh
+			setError("AttachmentType_Linkedmesh problem on skin ", input->getPath().buffer());
+			return NULL;
+		}
 		mesh->_path = path;
 		readColor(input, mesh->getColor());
 		String skinName(readStringRef(input, skeletonData));
+		SP_CHECK();
 		String parent(readStringRef(input, skeletonData));
+		SP_CHECK();
 		bool inheritDeform = readBoolean(input);
 		if (nonessential) {
 			mesh->_width = readFloat(input) * _scale;
@@ -681,6 +785,7 @@ Animation *SkeletonBinary::readAnimation(const String &name, DataInput *input, S
 					for (int frameIndex = 0; frameIndex < frameCount; ++frameIndex) {
 						float time = readFloat(input);
 						String attachmentName(readStringRef(input, skeletonData));
+						SP_CHECK();
 						timeline->setFrame(frameIndex, time, attachmentName);
 					}
 					timelines.add(timeline);
@@ -888,6 +993,7 @@ Animation *SkeletonBinary::readAnimation(const String &name, DataInput *input, S
 			int slotIndex = readVarint(input, true);
 			for (int iii = 0, nnn = readVarint(input, true); iii < nnn; iii++) {
 				const char *attachmentName = readStringRef(input, skeletonData);
+				SP_CHECK();
 				Attachment *baseAttachment = skin->getAttachment(slotIndex, String(attachmentName));
 
 				if (!baseAttachment) {
